@@ -1,0 +1,88 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "plugins": [
+    "@typescript-eslint"
+  ],
+  "extends": [
+    "airbnb-base"
+  ],
+  "env": {
+    "es6": true,
+    "node": true
+  },
+  "globals": {
+    "Atomics": "readonly",
+    "SharedArrayBuffer": "readonly"
+  },
+  "rules": {
+    "no-console": [
+      "error",
+      {
+        "allow": [
+          "log",
+          "error"
+        ]
+      }
+    ],
+    "no-warning-comments": "warn",
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "vars": "all",
+        "varsIgnorePattern": "[\\w_]+",
+        "args": "after-used",
+        "ignoreRestSiblings": false
+      }
+    ],
+    "no-useless-constructor": "off",
+    "@typescript-eslint/no-useless-constructor": "error",
+    "import/extensions": [
+      "error",
+      "ignorePackages",
+      {
+        "js": "never",
+        "mjs": "never",
+        "jsx": "never",
+        "ts": "never",
+        "tsx": "never"
+      }
+    ]
+  },
+  "settings": {
+    "import/extensions": [
+      ".js",
+      ".jsx",
+      ".ts",
+      ".tsx"
+    ],
+    "import/parsers": {
+      "@typescript-eslint/parser": [
+        ".ts",
+        ".tsx"
+      ]
+    },
+    "import/resolver": {
+      "typescript": {},
+      "node": {
+        "extensions": [
+          ".js",
+          ".jsx",
+          ".ts",
+          ".tsx"
+        ]
+      }
+    }
+  },
+  "overrides": [
+    {
+      "files": ["src/**/*.test.ts"],
+      "rules": {
+        "import/no-extraneous-dependencies": "off"
+      },
+      "env": {
+        "jest": true
+      }
+    }
+  ]
+}
