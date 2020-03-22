@@ -3,16 +3,16 @@ Middleware to validate incoming data in express endpoints using Yup's dead simpl
 
 [![Build Status](https://travis-ci.org/flasd/express-yup-middleware.svg?branch=master)](https://travis-ci.org/flasd/express-yup-middleware) 
 [![Coverage Status](https://coveralls.io/repos/github/flasd/express-yup-middleware/badge.svg?branch=master)](https://coveralls.io/github/flasd/express-yup-middleware?branch=master) 
-[![npm version](https://badge.fury.io/js/express-yup-middleware.svg)](https://www.npmjs.com/package/express-yup-middleware) 
-[![npm downloads per month](https://img.shields.io/npm/dm/express-yup-middleware.svg)](https://www.npmjs.com/package/express-yup-middleware)
+[![npm version](https://badge.fury.io/js/flasd%2Fexpress-yup-middleware.svg)](https://www.npmjs.com/package/@flasd/express-yup-middleware) 
+[![npm downloads per month](https://img.shields.io/npm/dm/@flasd/express-yup-middleware.svg)](https://www.npmjs.com/package/@flasd/express-yup-middleware)
 
 ## Instalation
 Install the latest version of express-yup-middleware:
 ```
-yarn add express-yup-middleware
+$ yarn add @flasd/express-yup-middleware
 
 // if you are feeling old school
-npm install express-yup-middleware --save
+$ npm install @flasd/express-yup-middleware --save
 ```
 
 Now you just import it as a module:
