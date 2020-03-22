@@ -1,24 +1,43 @@
-import { isSchema, object } from 'yup';
-import { Schema, ValidateOptions, ValidationError } from 'yup';
-import { Request, Response, NextFunction } from 'express';
+import {
+  isSchema,
+  object,
+  ValidationError,
+  ObjectSchemaDefinition,
+  Schema,
+  ValidateOptions,
+  // Its a peer dependency!
+  // eslint-disable-next-line import/no-unresolved
+} from 'yup';
+
+import {
+  Request, Response, NextFunction,
+  // Its a peer dependency!
+  // eslint-disable-next-line import/no-unresolved
+} from 'express';
 import deepmerge from 'deepmerge';
 import get from 'lodash.get';
+
 
 type ResponseOptions = {
   errorCode?: number;
   returnErrors?: boolean;
-  transformErrors?: (errors: Array<string>) => Array<string>
+  transformErrors?: (errors: Array<string>) => any
 }
 
-type ExpressYupMiddlewareConfig = {
+export type ExpressYupMiddlewareOptions = {
   validateOptions?: ValidateOptions,
   responseOptions?: ResponseOptions,
-  entityFrom: 'query' | 'body' | 'other',
-  entityPath?: string,
+  entityFrom?: 'query' | 'body' | 'request',
+  entityPath?: string | number | Array<string | number>,
   transformEntity?: (entity: any) => any
 }
 
-const defaults: ExpressYupMiddlewareConfig = {
+export interface ExpressYupMiddleware {
+  (req: Request, res: Response, next: NextFunction): Promise<void>
+}
+
+
+const defaults: ExpressYupMiddlewareOptions = {
   validateOptions: {
     strict: true,
     stripUnknown: true,
@@ -30,9 +49,12 @@ const defaults: ExpressYupMiddlewareConfig = {
     transformErrors: (e) => e,
   },
   entityFrom: 'body',
-}
+};
 
-function getSchema(schema: Schema<any> | object, validateOptions: ValidateOptions) {
+function getSchema(
+  schema: Schema<any> | ObjectSchemaDefinition<object>,
+  validateOptions: ValidateOptions,
+) {
   if (isSchema(schema)) {
     return schema;
   }
@@ -40,31 +62,43 @@ function getSchema(schema: Schema<any> | object, validateOptions: ValidateOption
   return object(schema).strict(validateOptions.strict);
 }
 
-export default function validate(schema: Schema<any> | Object, options?: ExpressYupMiddlewareConfig) {
-  const configs: ExpressYupMiddlewareConfig = deepmerge(
+function getEntity(req: Request, configs: ExpressYupMiddlewareOptions): any {
+  const { entityFrom, entityPath } = configs;
+
+  switch (entityFrom) {
+    case 'query':
+      return entityPath ? get(req.query, entityPath, {}) : req.query;
+    case 'request':
+      return entityPath ? get(req, entityPath, {}) : {};
+    case 'body':
+    default:
+      return entityPath ? get(req.body, entityPath, {}) : req.body;
+  }
+}
+
+
+export default function createValidation(
+  schema: Schema<any> | any,
+  options?: ExpressYupMiddlewareOptions,
+): ExpressYupMiddleware {
+  const configs: ExpressYupMiddlewareOptions = deepmerge(
     defaults,
-    options || {}
+    options || {},
   );
 
   const finalSchema = getSchema(schema, configs.validateOptions);
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      let entity: any;
-
-      if (configs.entityFrom === 'body') {
-        entity = configs.entityPath ? get(req.body, configs.entityPath, {}) : req.body;
-      } else if (configs.entityFrom === 'query') {
-        entity = configs.entityPath ? get(req.query, configs.entityPath, {}) : req.query;
-      } else {
-        entity = configs.entityPath ? get(req, configs.entityPath, {}) : null;
-      }
+      let entity: NonNullable<any> = getEntity(req, configs);
 
       if (typeof configs.transformEntity === 'function') {
-        entity = configs.transformEntity(entity);
+        entity = configs.transformEntity(entity) || {};
       }
 
-      await finalSchema.validate(entity, configs.validateOptions);
+      await finalSchema
+        .validate(entity, configs.validateOptions);
+
       next();
     } catch (error) {
       if (!(error instanceof ValidationError)) {
@@ -72,7 +106,14 @@ export default function validate(schema: Schema<any> | Object, options?: Express
       }
 
       const { errors } = error;
-      let payload = [];
+      let payload: string[] = [];
+
+      if (typeof configs.responseOptions.transformErrors !== 'function') {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[expressYupMiddleware]: configs.responseOptions.transformErrors must be a function. Instead got ${typeof configs.responseOptions.transformErrors}`,
+        );
+      }
 
       if (
         Array.isArray(errors)
@@ -83,7 +124,7 @@ export default function validate(schema: Schema<any> | Object, options?: Express
 
       res
         .status(configs.responseOptions.errorCode)
-        .send(configs.responseOptions.returnErrors ? { errors: payload } : {});
+        .send(configs.responseOptions.returnErrors ? { errors: payload } : { errors: [] });
     }
-  }
+  };
 }
