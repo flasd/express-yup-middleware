@@ -61,4 +61,4 @@ typings/
 src/
 
 # Tslint file
-tslint.json
+.eslintrc.json
