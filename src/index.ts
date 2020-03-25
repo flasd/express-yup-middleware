@@ -5,18 +5,18 @@ import {
   ObjectSchemaDefinition,
   Schema,
   ValidateOptions,
+  ObjectSchema,
   // Its a peer dependency!
   // eslint-disable-next-line import/no-unresolved
 } from 'yup';
 
 import {
-  Request, Response, NextFunction,
+  Request, Response, NextFunction, request,
   // Its a peer dependency!
   // eslint-disable-next-line import/no-unresolved
 } from 'express';
 import deepmerge from 'deepmerge';
 import get from 'lodash.get';
-
 
 type ResponseOptions = {
   errorCode?: number;
@@ -32,7 +32,7 @@ export type ExpressYupMiddlewareOptions = {
   transformEntity?: (entity: any) => any
 }
 
-export interface ExpressYupMiddleware {
+export interface ExpressYupMiddleware<T> {
   (req: Request, res: Response, next: NextFunction): Promise<void>
 }
 
@@ -51,15 +51,15 @@ const defaults: ExpressYupMiddlewareOptions = {
   entityFrom: 'body',
 };
 
-function getSchema(
-  schema: Schema<any> | ObjectSchemaDefinition<object>,
+function getSchema<T>(
+  schema: Schema<T> | ObjectSchemaDefinition<object & T>,
   validateOptions: ValidateOptions,
-) {
+): Schema<T> | ObjectSchema<object & T> {
   if (isSchema(schema)) {
-    return schema;
+    return schema as Schema<T>;
   }
 
-  return object(schema).strict(validateOptions.strict);
+  return object<object & T>(schema).strict(validateOptions.strict);
 }
 
 function getEntity(req: Request, configs: ExpressYupMiddlewareOptions): any {
@@ -76,11 +76,27 @@ function getEntity(req: Request, configs: ExpressYupMiddlewareOptions): any {
   }
 }
 
+function is<T>(it: any): it is T {
+  return it;
+}
 
-export default function createValidation(
-  schema: Schema<any> | any,
+function typeGuard<T>(
+  req: Request,
+  config: ExpressYupMiddlewareOptions,
+) {
+  const { entityFrom, entityPath } = config;
+
+  if (entityFrom !== 'request') {
+    return is<T>(req[entityFrom]);
+  }
+
+  return get(request, entityPath) as T;
+}
+
+export default function createValidation<T>(
+  schema: Schema<T> | ObjectSchemaDefinition<object & T>,
   options?: ExpressYupMiddlewareOptions,
-): ExpressYupMiddleware {
+): ExpressYupMiddleware<T> {
   const configs: ExpressYupMiddlewareOptions = deepmerge(
     defaults,
     options || {},
@@ -98,6 +114,8 @@ export default function createValidation(
 
       await finalSchema
         .validate(entity, configs.validateOptions);
+
+      typeGuard(req, configs);
 
       next();
     } catch (error) {
