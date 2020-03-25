@@ -60,4 +60,6 @@ typings/
 .env
 .env.test
 
-dist
+# Built files
+dist/
+index.d.ts
