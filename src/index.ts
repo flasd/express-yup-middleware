@@ -74,7 +74,7 @@ type RequestValidator = RequestHandler<ParamsDictionary, any, any, Query>;
 
 export default function createValidation<T>(
   schema: Schema<object> | ObjectSchemaDefinition<object>,
-  entityFrom: 'query' | 'body' | 'request' | string = 'body',
+  entityFrom: 'query' | 'body' | 'request' = 'body',
   options?: ExpressYupMiddlewareOptions,
 ): QueryValidator<T> | BodyValidator<T> | RequestValidator {
   const configs: ExpressYupMiddlewareOptions = deepmerge(
