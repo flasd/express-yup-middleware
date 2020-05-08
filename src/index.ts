@@ -6,36 +6,43 @@ import {
   Schema,
   ValidateOptions,
   ObjectSchema,
-  // Its a peer dependency!
-  // eslint-disable-next-line import/no-unresolved
 } from 'yup';
 
-import {
-  Request, Response, NextFunction, request,
-  // Its a peer dependency!
-  // eslint-disable-next-line import/no-unresolved
-} from 'express';
+import { Request, Response, NextFunction } from 'express';
 import deepmerge from 'deepmerge';
 import get from 'lodash.get';
+import {
+  Params,
+  ParamsDictionary,
+  Query,
+  // eslint-disable-next-line import/no-unresolved
+} from 'express-serve-static-core';
+
+interface RequestHandler<
+  P extends Params = ParamsDictionary,
+  ResBody = any,
+  ReqBody = any,
+  ReqQuery = Query
+> {
+  (
+    req: Request<P, ResBody, ReqBody, ReqQuery>,
+    res: Response<ResBody>,
+    next: NextFunction,
+  ): any;
+}
 
 type ResponseOptions = {
   errorCode?: number;
   returnErrors?: boolean;
-  transformErrors?: (errors: Array<string>) => any
-}
+  transformErrors?: (errors: Array<string>) => any;
+};
 
 export type ExpressYupMiddlewareOptions = {
-  validateOptions?: ValidateOptions,
-  responseOptions?: ResponseOptions,
-  entityFrom?: 'query' | 'body' | 'request',
-  entityPath?: string | number | Array<string | number>,
-  transformEntity?: (entity: any) => any
-}
-
-export interface ExpressYupMiddleware<T> {
-  (req: Request, res: Response, next: NextFunction): Promise<void>
-}
-
+  validateOptions?: ValidateOptions;
+  responseOptions?: ResponseOptions;
+  entityPath?: string | number | Array<string | number>;
+  transformEntity?: (entity: any) => any;
+};
 
 const defaults: ExpressYupMiddlewareOptions = {
   validateOptions: {
@@ -48,7 +55,6 @@ const defaults: ExpressYupMiddlewareOptions = {
     returnErrors: true,
     transformErrors: (e) => e,
   },
-  entityFrom: 'body',
 };
 
 function getSchema<T>(
@@ -62,87 +68,129 @@ function getSchema<T>(
   return object<object & T>(schema).strict(validateOptions.strict);
 }
 
-function getEntity(req: Request, configs: ExpressYupMiddlewareOptions): any {
-  const { entityFrom, entityPath } = configs;
-
-  switch (entityFrom) {
-    case 'query':
-      return entityPath ? get(req.query, entityPath, {}) : req.query;
-    case 'request':
-      return entityPath ? get(req, entityPath, {}) : {};
-    case 'body':
-    default:
-      return entityPath ? get(req.body, entityPath, {}) : req.body;
-  }
-}
-
-function is<T>(it: any): it is T {
-  return it;
-}
-
-function typeGuard<T>(
-  req: Request,
-  config: ExpressYupMiddlewareOptions,
-) {
-  const { entityFrom, entityPath } = config;
-
-  if (entityFrom !== 'request') {
-    return is<T>(req[entityFrom]);
-  }
-
-  return get(request, entityPath) as T;
-}
+type QueryValidator<Q> = RequestHandler<ParamsDictionary, any, any, Q>;
+type BodyValidator<B> = RequestHandler<ParamsDictionary, any, B, Query>;
+type RequestValidator = RequestHandler<ParamsDictionary, any, any, Query>;
 
 export default function createValidation<T>(
-  schema: Schema<T> | ObjectSchemaDefinition<object & T>,
+  schema: Schema<object> | ObjectSchemaDefinition<object>,
+  entityFrom: 'query' | 'body' | 'request' | string = 'body',
   options?: ExpressYupMiddlewareOptions,
-): ExpressYupMiddleware<T> {
+): QueryValidator<T> | BodyValidator<T> | RequestValidator {
   const configs: ExpressYupMiddlewareOptions = deepmerge(
     defaults,
-    options || {},
+    typeof entityFrom !== 'string' ? entityFrom : options || {},
   );
 
   const finalSchema = getSchema(schema, configs.validateOptions);
 
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      let entity: NonNullable<any> = getEntity(req, configs);
+  const { entityPath } = configs;
 
-      if (typeof configs.transformEntity === 'function') {
-        entity = configs.transformEntity(entity) || {};
+  function handleError(res: Response, error: Error) {
+    if (!(error instanceof ValidationError)) {
+      if (process.env.NODE_ENV === 'development') {
+        res.status(500).send(error);
+      } else {
+        res.status(500).send();
       }
 
-      await finalSchema
-        .validate(entity, configs.validateOptions);
-
-      typeGuard(req, configs);
-
-      next();
-    } catch (error) {
-      if (!(error instanceof ValidationError)) {
-        throw error;
-      }
-
-      const { errors } = error;
-      let payload: string[] = [];
-
-      if (typeof configs.responseOptions.transformErrors !== 'function') {
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[expressYupMiddleware]: configs.responseOptions.transformErrors must be a function. Instead got ${typeof configs.responseOptions.transformErrors}`,
-        );
-      }
-
-      if (
-        Array.isArray(errors)
-        && typeof configs.responseOptions.transformErrors === 'function'
-      ) {
-        payload = configs.responseOptions.transformErrors(errors);
-      }
-
-      res
-        .status(configs.responseOptions.errorCode)
-        .send(configs.responseOptions.returnErrors ? { errors: payload } : { errors: [] });
+      return;
     }
-  };
+
+    const { errors } = error;
+    let payload: string[] = [];
+
+    if (typeof configs.responseOptions.transformErrors !== 'function') {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[expressYupMiddleware]: configs.responseOptions.transformErrors must be a function. Instead got ${typeof configs
+          .responseOptions.transformErrors}`,
+      );
+    }
+
+    if (
+      Array.isArray(errors) &&
+      typeof configs.responseOptions.transformErrors === 'function'
+    ) {
+      payload = configs.responseOptions.transformErrors(errors);
+    }
+
+    res
+      .status(configs.responseOptions.errorCode)
+      .send(
+        configs.responseOptions.returnErrors
+          ? { errors: payload }
+          : { errors: [] },
+      );
+  }
+
+  if (entityFrom === 'body') {
+    return async (
+      req: Request & { body: any },
+      res: Response,
+      next: NextFunction,
+    ): Promise<void> => {
+      try {
+        let entity = entityPath ? get(req.body, entityPath, {}) : req.body;
+
+        if (typeof configs.transformEntity === 'function') {
+          entity = configs.transformEntity(entity) || {};
+        }
+
+        await finalSchema.validate(entity, configs.validateOptions);
+
+        next();
+      } catch (error) {
+        handleError(res, error);
+      }
+    };
+  }
+
+  if (entityFrom === 'query') {
+    return async (
+      req: Request & { query: any },
+      res: Response,
+      next: NextFunction,
+    ): Promise<void> => {
+      try {
+        let entity = entityPath ? get(req.query, entityPath, {}) : req.query;
+
+        if (typeof configs.transformEntity === 'function') {
+          entity = configs.transformEntity(entity) || {};
+        }
+
+        await finalSchema.validate(entity, configs.validateOptions);
+
+        next();
+      } catch (error) {
+        handleError(res, error);
+      }
+    };
+  }
+
+  if (entityFrom === 'request') {
+    return async (
+      req: Request,
+      res: Response,
+      next: NextFunction,
+    ): Promise<void> => {
+      try {
+        let entity = entityPath ? get(req, entityPath, {}) : {};
+
+        if (typeof configs.transformEntity === 'function') {
+          entity = configs.transformEntity(entity) || {};
+        }
+
+        await finalSchema.validate(entity, configs.validateOptions);
+
+        next();
+      } catch (error) {
+        handleError(res, error);
+      }
+    };
+  }
+
+  throw new Error(
+    `[expressYupMiddleware]: Failed to instantiate validator. Option ${entityFrom} is not valid oneOf ['body', 'query', 'request']`,
+  );
 }

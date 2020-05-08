@@ -13,7 +13,6 @@ function getApp() {
   return app;
 }
 
-
 describe('expressYupMiddleware', () => {
   it('should be ok', () => {
     expect(createValidation).toBeTruthy();
@@ -21,7 +20,9 @@ describe('expressYupMiddleware', () => {
   });
 
   it('should create a middleware with default options', () => {
-    expect(() => createValidation({ name: Yup.string().required() })).not.toThrow();
+    expect(() =>
+      createValidation({ name: Yup.string().required() }),
+    ).not.toThrow();
 
     const middleware = createValidation({ name: Yup.string().required() });
     expect(typeof middleware).toBe('function');
@@ -30,9 +31,7 @@ describe('expressYupMiddleware', () => {
   it('should validate with default options', async () => {
     const app = getApp();
 
-    app.use(
-      createValidation({ name: Yup.string().required() }),
-    );
+    app.use(createValidation({ name: Yup.string().required() }));
 
     const response = await request(app)
       .post('/any')
@@ -54,9 +53,7 @@ describe('expressYupMiddleware', () => {
       createValidation(Yup.array().of(Yup.number())),
     );
 
-    const response = await request(app)
-      .post('/any')
-      .send([1, 2, '3']);
+    const response = await request(app).post('/any').send([1, 2, '3']);
 
     expect(response.status).toBe(422);
     expect(response.body).toHaveProperty('errors');
@@ -67,13 +64,9 @@ describe('expressYupMiddleware', () => {
   it('should validate numbers', async () => {
     const app = getApp();
 
-    app.use(
-      createValidation(Yup.number()),
-    );
+    app.use(createValidation(Yup.number()));
 
-    const response = await request(app)
-      .post('/any')
-      .send('hello!');
+    const response = await request(app).post('/any').send('hello!');
 
     expect(response.status).toBe(422);
     expect(response.body).toHaveProperty('errors');
@@ -84,13 +77,9 @@ describe('expressYupMiddleware', () => {
   it('should validate strings', async () => {
     const app = getApp();
 
-    app.use(
-      createValidation(Yup.string()),
-    );
+    app.use(createValidation(Yup.string()));
 
-    const response = await request(app)
-      .post('/any')
-      .send('2');
+    const response = await request(app).post('/any').send('2');
 
     expect(response.status).toBe(422);
     expect(response.body).toHaveProperty('errors');
@@ -102,12 +91,12 @@ describe('expressYupMiddleware', () => {
     const app = getApp();
 
     app.use(
-      createValidation(Yup.string(), { responseOptions: { errorCode: 400 } }),
+      createValidation(Yup.string(), 'body', {
+        responseOptions: { errorCode: 400 },
+      }),
     );
 
-    const response = await request(app)
-      .post('/any')
-      .send([1, 2, 3]);
+    const response = await request(app).post('/any').send([1, 2, 3]);
 
     expect(response.status).toBe(400);
     expect(response.body).toHaveProperty('errors');
@@ -119,12 +108,12 @@ describe('expressYupMiddleware', () => {
     const app = getApp();
 
     app.use(
-      createValidation(Yup.string(), { responseOptions: { returnErrors: false } }),
+      createValidation(Yup.string(), 'body', {
+        responseOptions: { returnErrors: false },
+      }),
     );
 
-    const response = await request(app)
-      .post('/any')
-      .send([1, 2, 3]);
+    const response = await request(app).post('/any').send([1, 2, 3]);
 
     expect(response.status).toBe(422);
     expect(response.body).toHaveProperty('errors');
@@ -134,16 +123,19 @@ describe('expressYupMiddleware', () => {
   it('should transform errors properly', async () => {
     const app = getApp();
 
-    const transformErrors = jest.fn()
-      .mockImplementation((errors: string[]) => errors.map((error) => `## ${error}`));
+    const transformErrors = jest
+      .fn()
+      .mockImplementation((errors: string[]) =>
+        errors.map((error) => `## ${error}`),
+      );
 
     app.use(
-      createValidation(Yup.string(), { responseOptions: { transformErrors } }),
+      createValidation(Yup.string(), 'body', {
+        responseOptions: { transformErrors },
+      }),
     );
 
-    const response = await request(app)
-      .post('/any')
-      .send([1, 2, 3]);
+    const response = await request(app).post('/any').send([1, 2, 3]);
 
     expect(response.status).toBe(422);
     expect(response.body).toHaveProperty('errors');
@@ -156,12 +148,12 @@ describe('expressYupMiddleware', () => {
     const app = getApp();
 
     app.use(
-      createValidation(Yup.number(), { entityFrom: 'body', entityPath: 'hello' }),
+      createValidation(Yup.number(), 'body', {
+        entityPath: 'hello',
+      }),
     );
 
-    const response = await request(app)
-      .post('/any')
-      .send({ hello: 'world' });
+    const response = await request(app).post('/any').send({ hello: 'world' });
 
     expect(response.status).toBe(422);
     expect(response.body).toHaveProperty('errors');
@@ -173,9 +165,7 @@ describe('expressYupMiddleware', () => {
   it('should extract entity from query', async () => {
     const app = getApp();
 
-    app.use(
-      createValidation(Yup.number(), { entityFrom: 'query' }),
-    );
+    app.use(createValidation(Yup.number(), 'query'));
 
     const response = await request(app)
       .get('/any')
@@ -194,7 +184,9 @@ describe('expressYupMiddleware', () => {
     const app = getApp();
 
     app.use(
-      createValidation(Yup.number(), { entityFrom: 'query', entityPath: 'hello' }),
+      createValidation(Yup.number(), 'query', {
+        entityPath: 'hello',
+      }),
     );
 
     const response = await request(app)
@@ -212,8 +204,7 @@ describe('expressYupMiddleware', () => {
     const app = getApp();
 
     app.use(
-      createValidation(Yup.number().required(), {
-        entityFrom: 'request',
+      createValidation(Yup.number().required(), 'request', {
         entityPath: ['headers', 'authorization'],
       }),
     );
@@ -232,15 +223,9 @@ describe('expressYupMiddleware', () => {
   it('should fail to extract entity from request when entityPath is not set', async () => {
     const app = getApp();
 
-    app.use(
-      createValidation(Yup.number().required(), {
-        entityFrom: 'request',
-      }),
-    );
+    app.use(createValidation(Yup.number().required(), 'request'));
 
-    const response = await request(app)
-      .get('/any')
-      .send();
+    const response = await request(app).get('/any').send();
 
     expect(response.status).toBe(422);
     expect(response.body).toHaveProperty('errors');
@@ -251,14 +236,13 @@ describe('expressYupMiddleware', () => {
   it('should transform entity when needed', async () => {
     const app = getApp();
 
-    const transformEntity = jest.fn()
+    const transformEntity = jest
+      .fn()
       .mockImplementation(
         (entity: { data: { world: string } }) => entity.data.world,
       );
 
-    app.use(
-      createValidation(Yup.string(), { transformEntity }),
-    );
+    app.use(createValidation(Yup.string(), 'body', { transformEntity }));
 
     app.use((req, res) => {
       // Respond with success status
@@ -280,14 +264,9 @@ describe('expressYupMiddleware', () => {
   it('should fail when transform entity returns falsy', async () => {
     const app = getApp();
 
-    const transformEntity = jest.fn()
-      .mockImplementation(
-        () => null,
-      );
+    const transformEntity = jest.fn().mockImplementation(() => null);
 
-    app.use(
-      createValidation(Yup.string(), { transformEntity }),
-    );
+    app.use(createValidation(Yup.string(), 'body', { transformEntity }));
 
     const response = await request(app)
       .post('/any')
@@ -308,13 +287,14 @@ describe('expressYupMiddleware', () => {
     const res = mockHttp.createResponse();
 
     const error = new Error('Not a validation error');
-    const transformEntity = jest.fn()
-      .mockImplementationOnce(
-        () => { throw error; },
-      );
+    const transformEntity = jest.fn().mockImplementationOnce(() => {
+      throw error;
+    });
 
     try {
-      const middleware = createValidation(Yup.string(), { transformEntity });
+      const middleware = createValidation(Yup.string(), 'body', {
+        transformEntity,
+      });
       await middleware(req, res, () => {});
     } catch (thrown) {
       expect(thrown).toBe(error);
@@ -326,17 +306,17 @@ describe('expressYupMiddleware', () => {
     const app = getApp();
 
     app.use(
-      // Ignore type definition since we are testing exception
-      // @ts-ignore
-      createValidation(Yup.string(), { responseOptions: { transformErrors: 2 } }),
+      createValidation(Yup.string(), 'body', {
+        // Ignore type definition since we are testing exception
+        // @ts-ignore
+        responseOptions: { transformErrors: 2 },
+      }),
     );
 
     const { warn } = console;
     console.warn = jest.fn();
 
-    await request(app)
-      .post('/any')
-      .send({});
+    await request(app).post('/any').send({});
 
     expect(console.warn).toHaveBeenCalled();
 

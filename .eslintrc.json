@@ -1,11 +1,7 @@
 {
   "parser": "@typescript-eslint/parser",
-  "plugins": [
-    "@typescript-eslint"
-  ],
-  "extends": [
-    "airbnb-base"
-  ],
+  "plugins": ["@typescript-eslint"],
+  "extends": ["airbnb-base", "prettier"],
   "env": {
     "es6": true,
     "node": true
@@ -15,13 +11,12 @@
     "SharedArrayBuffer": "readonly"
   },
   "rules": {
+    "operator-linebreak": "off",
+    "implicit-arrow-linebreak": "off",
     "no-console": [
       "error",
       {
-        "allow": [
-          "log",
-          "error"
-        ]
+        "allow": ["log", "error"]
       }
     ],
     "no-warning-comments": "warn",
@@ -50,27 +45,14 @@
     ]
   },
   "settings": {
-    "import/extensions": [
-      ".js",
-      ".jsx",
-      ".ts",
-      ".tsx"
-    ],
+    "import/extensions": [".js", ".jsx", ".ts", ".tsx"],
     "import/parsers": {
-      "@typescript-eslint/parser": [
-        ".ts",
-        ".tsx"
-      ]
+      "@typescript-eslint/parser": [".ts", ".tsx"]
     },
     "import/resolver": {
       "typescript": {},
       "node": {
-        "extensions": [
-          ".js",
-          ".jsx",
-          ".ts",
-          ".tsx"
-        ]
+        "extensions": [".js", ".jsx", ".ts", ".tsx"]
       }
     }
   },
